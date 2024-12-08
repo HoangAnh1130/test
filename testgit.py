@@ -1,4 +1,7 @@
+import duckdb
 import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 #######################################
@@ -77,7 +80,50 @@ for uploaded_file in uploaded_files:
 # Nếu cần ghép tất cả DataFrames lại với nhau
 if dataframes:
     combined_df = pd.concat(dataframes, ignore_index=True)
-    st.write("Combined DataFrame:")
-    st.dataframe(combined_df)
+    # st.write("Combined DataFrame:")
+    # st.dataframe(combined_df)
 
+with st.expander('Claim amount by group data view') :
+    combined_df["Nhóm"] = combined_df["Nhóm"].str.strip().str.lower()
+    combined_df["Nhóm"] = combined_df["Nhóm"].replace({
+    'others': 'Dependant',
+    'member': 'Employee',
+    'child': 'Dependant',
+    'children' : 'Dependant',
+    'nhanvien_01' : 'Employee',
+    'người thân' : 'Dependant',
+    'nguoithan_01' : 'Dependant',
+    'nhân viên' : 'Employee'
+})
+    by_group = duckdb.sql("""
+    SELECT 
+        "Nhóm",
+        SUM("Yêu cầu bồi thường") AS "Số tiền yêu cầu được bồi thường",
+        SUM("Đã được bồi thường") AS "Số tiền được bồi thường"
+    FROM combined_df
+    GROUP BY "Nhóm"
+""").df()
 
+    st.dataframe(by_group)
+
+# This dataframe has 244 lines, but 4 distinct values for `day`
+fig1 = px.pie(combined_df, names='Nhóm', values='Yêu cầu bồi thường', title='Số tiền yêu cầu bồi thường theo nhóm', 
+              color="Nhóm",  # Cột để ánh xạ màu
+    color_discrete_map={
+        "Dependant": "#3A0751", 
+        "Employee": "#f2c85b"
+    }  # Ánh xạ màu
+              )
+fig2 = px.pie(combined_df, names='Nhóm', values='Đã được bồi thường', title='Số tiền đã bồi thường theo nhóm')
+
+# Sử dụng st.columns để chia giao diện thành 2 cột
+col1, col2 = st.columns(2)
+
+# Hiển thị các pie chart trong các cột tương ứng
+with col1:
+    st.plotly_chart(fig1)
+
+with col2:
+    st.plotly_chart(fig2)
+
+        
